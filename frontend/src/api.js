@@ -132,12 +132,20 @@ async function postPublic(path, body) {
   return data;
 }
 
-export async function loginRequest(username, password) {
-  return postPublic("/api/auth/login/", { username, password });
+export async function loginRequest(email, password) {
+  return postPublic("/api/auth/login/", { email, password });
 }
 
 export async function registerRequest(payload) {
   return postPublic("/api/auth/register/", payload);
+}
+
+export async function googleLoginRequest(idToken, creds = {}) {
+  return postPublic("/api/auth/google/", {
+    id_token: idToken,
+    ...(creds.username ? { username: creds.username } : {}),
+    ...(creds.password ? { password: creds.password } : {}),
+  });
 }
 
 export async function fetchMe() {
@@ -148,6 +156,13 @@ export async function patchMe(body) {
   return fetchJson("/api/auth/me/", {
     method: "PATCH",
     body: JSON.stringify(body),
+  });
+}
+
+export async function setPasswordRequest(password) {
+  return fetchJson("/api/auth/set-password/", {
+    method: "POST",
+    body: JSON.stringify({ password }),
   });
 }
 
@@ -171,11 +186,13 @@ export async function patchHabitOnServer(habitId, body) {
   });
 }
 
-/** POST /api/ai/chat/ — JWT; 401 обрабатывается в fetchJson (refresh + retry) */
-export async function sendAiMessage(message) {
+/** POST /api/ai/chat/ — JWT; Gemini на бэкенде; 401 обрабатывается в fetchJson */
+export async function sendAiMessage(message, context = null) {
+  const body = { message };
+  if (context && typeof context === "object") body.context = context;
   return fetchJson("/api/ai/chat/", {
     method: "POST",
-    body: JSON.stringify({ message }),
+    body: JSON.stringify(body),
   });
 }
 

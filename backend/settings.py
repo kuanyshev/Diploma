@@ -176,3 +176,14 @@ SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
 }
+
+# Google Sign-In
+# Backend verifies Google ID token with this audience.
+GOOGLE_CLIENT_ID = os.getenv(
+    "GOOGLE_CLIENT_ID",
+    "228109311943-20j9dqn4v0h79eqcejtkcc8l22jdqm2v.apps.googleusercontent.com",
+)
+
+# Gemini (Google AI Studio) — Tasks tab; ключ можно задать как GEMINI_API_KEY или GOOGLE_API_KEY
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY", "")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")

@@ -21,7 +21,7 @@ from django.views.generic import RedirectView
 from rest_framework_simplejwt.views import TokenRefreshView
 
 from ai.views import ai_chat_view
-from users.views import RegisterView, LoginView, MeView
+from users.views import RegisterView, LoginView, MeView, GoogleLoginView, SetPasswordView
 
 urlpatterns = [
     path('', RedirectView.as_view(url='/habits/', permanent=False)),
@@ -32,6 +32,8 @@ urlpatterns = [
     # auth API
     path('api/auth/register/', RegisterView.as_view(), name='api_register'),
     path('api/auth/login/', LoginView.as_view(), name='api_login'),
+    path('api/auth/google/', GoogleLoginView.as_view(), name='api_google_login'),
+    path('api/auth/set-password/', SetPasswordView.as_view(), name='api_set_password'),
     path('api/auth/token/refresh/', TokenRefreshView.as_view(), name='api_token_refresh'),
     path('api/auth/me/', MeView.as_view(), name='api_me'),
     path('api/ai/chat/', ai_chat_view, name='api_ai_chat'),

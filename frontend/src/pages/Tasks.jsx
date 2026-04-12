@@ -267,11 +267,25 @@ export default function Tasks() {
     setAiLoading(true);
 
     try {
-      const data = await sendAiMessage(text);
+      const data = await sendAiMessage(text, {
+        habitName: activeHabit.habitName,
+        habitDescription: activeHabit.description || "",
+        goalStartDate: activeHabit.startDate,
+        goalEndDate: activeHabit.endDate,
+        selectedDate: selectedKey,
+        existingTasks: tasks.map((t) => ({
+          text: t.text,
+          startTime: t.startTime,
+          endTime: t.endTime,
+        })),
+      });
       const reply = data?.reply ?? "";
       setAiMessages((prev) => [...prev, { role: "ai", text: reply }]);
-    } catch {
-      setAiMessages((prev) => [...prev, { role: "ai", text: "AI error" }]);
+    } catch (e) {
+      setAiMessages((prev) => [
+        ...prev,
+        { role: "ai", text: e?.message || "AI error" },
+      ]);
     } finally {
       setAiLoading(false);
     }
