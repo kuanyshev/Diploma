@@ -2,6 +2,7 @@ services:
   - type: web
     name: habits-backend
     env: python
+    runtime: python-3.12.10
     plan: free
     buildCommand: |
       pip install -r requirements.txt
