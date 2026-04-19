@@ -79,17 +79,19 @@ def _split_env_list(name: str):
     return [x.strip() for x in raw.split(",") if x.strip()]
 
 
-_render_host = os.getenv("RENDER_EXTERNAL_HOSTNAME")
-
-ALLOWED_HOSTS = _split_env_list("ALLOWED_HOSTS")
-
-if not ALLOWED_HOSTS:
+_allowed = _split_env_list("ALLOWED_HOSTS")
+if _allowed:
+    ALLOWED_HOSTS = _allowed
+else:
     ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
+    _render_host = (os.getenv("RENDER_EXTERNAL_HOSTNAME") or "").strip()
+    if _render_host:
+        ALLOWED_HOSTS.append(_render_host)
+    # Render docs: RENDER is always the string "true" on the platform.
+    if (os.getenv("RENDER") or "").strip().lower() == "true":
+        if ".onrender.com" not in ALLOWED_HOSTS:
+            ALLOWED_HOSTS.append(".onrender.com")
 
-if _render_host:
-    ALLOWED_HOSTS.append(_render_host)
-
-ALLOWED_HOSTS.append(".onrender.com")
 
 # Application definition
 
