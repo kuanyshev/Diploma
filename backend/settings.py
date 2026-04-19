@@ -12,8 +12,13 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 
 from pathlib import Path
 import os
+import secrets
+import sys
 from datetime import timedelta
+
+import dj_database_url
 from corsheaders.defaults import default_headers
+from django.core.exceptions import ImproperlyConfigured
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -31,13 +36,41 @@ except ImportError:
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = (os.getenv("DJANGO_SECRET_KEY") or "").strip()
-if not SECRET_KEY:
-    # Dev fallback so `manage.py` still works locally when env is missing.
-    SECRET_KEY = "dev-only-secret-key"
-
-# SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = (os.getenv("DEBUG") or "").strip().lower() in ("1", "true", "yes", "on")
+
+
+def _manage_subcommand() -> str | None:
+    try:
+        i = sys.argv.index("manage.py")
+    except ValueError:
+        return None
+    return sys.argv[i + 1] if i + 1 < len(sys.argv) else None
+
+
+def _ephemeral_secret_for_build_commands() -> bool:
+    """Render/Heroku-style builds run collectstatic/migrate before runtime secrets exist."""
+    sub = _manage_subcommand()
+    return sub in (
+        "collectstatic",
+        "migrate",
+        "makemigrations",
+        "showmigrations",
+        "sqlmigrate",
+        "squashmigrations",
+    )
+
+
+SECRET_KEY = (os.getenv("DJANGO_SECRET_KEY") or os.getenv("SECRET_KEY") or "").strip()
+if not SECRET_KEY:
+    if DEBUG:
+        SECRET_KEY = "dev-only-secret-key-change-me"
+    elif _ephemeral_secret_for_build_commands():
+        # Never used for serving traffic; only so management commands can load settings
+        # when the platform has not injected secrets yet (e.g. some build phases).
+        SECRET_KEY = secrets.token_urlsafe(64)
+    else:
+        raise ImproperlyConfigured("DJANGO_SECRET_KEY must be set when DEBUG is off.")
+
 
 def _split_env_list(name: str):
     raw = (os.getenv(name) or "").strip()
@@ -45,8 +78,18 @@ def _split_env_list(name: str):
         return []
     return [x.strip() for x in raw.split(",") if x.strip()]
 
-ALLOWED_HOSTS = _split_env_list("ALLOWED_HOSTS") or ["localhost", "127.0.0.1"]
 
+_render_host = os.getenv("RENDER_EXTERNAL_HOSTNAME")
+
+ALLOWED_HOSTS = _split_env_list("ALLOWED_HOSTS")
+
+if not ALLOWED_HOSTS:
+    ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
+
+if _render_host:
+    ALLOWED_HOSTS.append(_render_host)
+
+ALLOWED_HOSTS.append(".onrender.com")
 
 # Application definition
 
@@ -104,8 +147,6 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 
 DATABASE_URL = (os.getenv("DATABASE_URL") or "").strip()
 if DATABASE_URL:
-    import dj_database_url
-
     DATABASES = {
         "default": dj_database_url.parse(
             DATABASE_URL,
@@ -166,7 +207,7 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 
 STORAGES = {
     "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
-    "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
+    "staticfiles": {"BACKEND": "whitenoise.storage.CompressedStaticFilesStorage"},
 }
 
 # Default primary key field type
@@ -193,7 +234,14 @@ CORS_ALLOW_HEADERS = list(default_headers) + [
     "authorization",
 ]
 
-CSRF_TRUSTED_ORIGINS = _split_env_list("CSRF_TRUSTED_ORIGINS")
+CSRF_TRUSTED_ORIGINS = list(_split_env_list("CSRF_TRUSTED_ORIGINS"))
+_render_ext_url = (os.getenv("RENDER_EXTERNAL_URL") or "").strip().rstrip("/")
+if _render_ext_url and _render_ext_url not in CSRF_TRUSTED_ORIGINS:
+    CSRF_TRUSTED_ORIGINS.append(_render_ext_url)
+elif (os.getenv("RENDER_EXTERNAL_HOSTNAME") or "").strip() and not _render_ext_url:
+    _origin = f"https://{(os.getenv('RENDER_EXTERNAL_HOSTNAME') or '').strip()}"
+    if _origin not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS.append(_origin)
 
 # Куда редиректить неавторизованных пользователей (@login_required)
 LOGIN_URL = '/admin/login/'
@@ -212,13 +260,16 @@ SIMPLE_JWT = {
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
 }
 
-# Google Sign-In
-# Backend verifies Google ID token with this audience.
-GOOGLE_CLIENT_ID = os.getenv(
-    "GOOGLE_CLIENT_ID",
-    "228109311943-20j9dqn4v0h79eqcejtkcc8l22jdqm2v.apps.googleusercontent.com",
-)
+# Google Sign-In (OAuth client ID from Google Cloud Console)
+GOOGLE_CLIENT_ID = (os.getenv("GOOGLE_CLIENT_ID") or "").strip()
 
-# Gemini (Google AI Studio) — Tasks tab; ключ можно задать как GEMINI_API_KEY или GOOGLE_API_KEY
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY", "")
+# Gemini (Google AI Studio)
+GEMINI_API_KEY = (os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or "").strip()
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+
+if not DEBUG:
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    X_FRAME_OPTIONS = "DENY"

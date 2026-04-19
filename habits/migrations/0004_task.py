@@ -17,10 +17,53 @@ def _column_exists(cursor, table, column):
     return cursor.fetchone() is not None
 
 
+def _sqlite_column_names(cursor, table):
+    cursor.execute(f'PRAGMA table_info("{table}")')
+    return {row[1] for row in cursor.fetchall()}
+
+
 def _ensure_task_schema(apps, schema_editor):
-    if schema_editor.connection.vendor != "postgresql":
-        return
     table = "habits_task"
+    vendor = schema_editor.connection.vendor
+
+    if vendor == "sqlite":
+        with schema_editor.connection.cursor() as cursor:
+            cols = _sqlite_column_names(cursor, table)
+            if not cols:
+                cursor.execute(
+                    f'''
+                    CREATE TABLE "{table}" (
+                        "id" integer NOT NULL PRIMARY KEY AUTOINCREMENT,
+                        "text" text NOT NULL DEFAULT '',
+                        "scheduled_date" date NULL,
+                        "start_time" time NULL,
+                        "end_time" time NULL,
+                        "completed" integer NOT NULL DEFAULT 0,
+                        "xp" integer NOT NULL DEFAULT 100,
+                        "created_at" datetime NOT NULL,
+                        "habit_id" bigint NOT NULL REFERENCES "habits_habit" ("id")
+                            DEFERRABLE INITIALLY DEFERRED
+                    )
+                    '''
+                )
+                return
+            alters = [
+                ("scheduled_date", "DATE NULL"),
+                ("start_time", "TIME NULL"),
+                ("end_time", "TIME NULL"),
+                ("completed", "integer NOT NULL DEFAULT 0"),
+                ("xp", "integer NOT NULL DEFAULT 100"),
+                ("created_at", "datetime NOT NULL DEFAULT CURRENT_TIMESTAMP"),
+            ]
+            for col, ddl in alters:
+                if col in cols:
+                    continue
+                cursor.execute(f'ALTER TABLE "{table}" ADD COLUMN "{col}" {ddl}')
+        return
+
+    if vendor != "postgresql":
+        return
+
     with schema_editor.connection.cursor() as cursor:
         cursor.execute(
             """

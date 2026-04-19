@@ -23,7 +23,10 @@ from rest_framework_simplejwt.views import TokenRefreshView
 from ai.views import ai_chat_view
 from users.views import RegisterView, LoginView, MeView, GoogleLoginView, SetPasswordView
 
+from .views import health
+
 urlpatterns = [
+    path("health/", health, name="health"),
     path('', RedirectView.as_view(url='/habits/', permanent=False)),
     path('admin/', admin.site.urls),
     path('habits/', include('habits.urls')),

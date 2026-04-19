@@ -55,7 +55,7 @@ def ai_chat_view(request):
         return Response(
             {
                 "error": "Gemini is not configured",
-                "detail": "Set GEMINI_API_KEY (or GOOGLE_API_KEY) in the environment or in a .env file at the project root. See .env.example.",
+                "detail": "Set GEMINI_API_KEY or GOOGLE_API_KEY in the server environment.",
             },
             status=503,
         )
