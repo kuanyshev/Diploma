@@ -2,7 +2,6 @@ services:
   - type: web
     name: habits-backend
     env: python
-    runtime: python3.12
     plan: free
     buildCommand: bash bin/render-build.sh
     # Unset GUNICORN_CMD_ARGS: Render injects --bind=0.0.0.0:10000 which can clash with $PORT.
